@@ -1,4 +1,3 @@
-```javascript
 const TronWeb = require("tronweb");
 const fs = require("fs");
 const bip39 = require("bip39");
@@ -290,4 +289,4 @@ async function main() {
 }
 
 main();
-```
+    
