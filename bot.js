@@ -123,12 +123,18 @@ async function sendTransaction(privateKey, toAddress) {
 
   // Sisakan 1 TRX untuk fee transaksi
   const reserve = 1_000_000; // 1 TRX
-
   const amount = balance - reserve;
 
   if (amount <= 0) {
    console.log("Saldo terlalu kecil untuk dikirim\n");
    return;
+  }
+
+  // Jika bandwidth rendah, tunggu
+  if (bandwidth < 100) {
+   console.log("Bandwidth rendah, menunggu...\n");
+   await sleep(10000); // Tunggu 10 detik
+   return; // Skip transaksi
   }
 
   const txn = await tronWeb.transactionBuilder.sendTrx(
@@ -140,18 +146,23 @@ async function sendTransaction(privateKey, toAddress) {
   const signed = await tronWeb.trx.sign(txn, privateKey);
   const result = await tronWeb.trx.sendRawTransaction(signed);
 
+  // Mengecek hasil transaksi
   if (result.result) {
    console.log("✅ Berhasil kirim");
    console.log("TXID:", result.txid, "\n");
   } else {
-   console.log("❌ Transaksi gagal\n");
+   console.log("❌ Transaksi gagal, response:", result);
   }
 
  } catch (err) {
   console.log("Error transaksi:", err.message || err);
+
+  // Menambahkan retry untuk transaksi yang gagal
+  console.log("Retrying...");
   switchRPC();
-  await sleep(3000);
- }
+  await sleep(5000);  // Delay antar retry
+
+  await sendTransaction(privateKey, toAddress);  // Retry
 }
 
 //////////////////////////////////////////////////////
