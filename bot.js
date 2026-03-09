@@ -23,10 +23,14 @@ let tronWeb = new TronWeb({
 });
 
 function switchRPC() {
-  currentRPC++;
-  if (currentRPC >= RPC_LIST.length) currentRPC = 0;
 
-  console.log("Switch RPC ->", RPC_LIST[currentRPC]);
+  currentRPC++;
+
+  if (currentRPC >= RPC_LIST.length) {
+    currentRPC = 0;
+  }
+
+  console.log("Switch RPC -> " + RPC_LIST[currentRPC]);
 
   tronWeb = new TronWeb({
     fullHost: RPC_LIST[currentRPC]
@@ -54,14 +58,20 @@ function sleep(ms) {
 // GENERATE WALLET
 //////////////////////////////////////////////////////
 
-function generateAccountsFromMnemonic(mnemonic, count = 10) {
+function generateAccountsFromMnemonic(mnemonic, count) {
+
   const seed = bip39.mnemonicToSeedSync(mnemonic);
+
   const root = hdkey.fromMasterSeed(seed);
 
   const privateKeys = [];
 
   for (let i = 0; i < count; i++) {
-    const child = root.derive(`m/44'/195'/0'/0/${i}`);
+
+    const path = "m/44'/195'/0'/0/" + i;
+
+    const child = root.derive(path);
+
     privateKeys.push(child.privateKey.toString("hex"));
   }
 
@@ -76,9 +86,9 @@ function saveAddresses(privateKeys) {
 
   fs.writeFileSync("accounts.txt", privateKeys.join("\n"));
 
-  const addresses = privateKeys.map(pk =>
-    tronWeb.address.fromPrivateKey(pk)
-  );
+  const addresses = privateKeys.map(function (pk) {
+    return tronWeb.address.fromPrivateKey(pk);
+  });
 
   fs.writeFileSync("address.txt", addresses.join("\n"));
 }
@@ -88,6 +98,7 @@ function saveAddresses(privateKeys) {
 //////////////////////////////////////////////////////
 
 async function getBalance(address) {
+
   try {
 
     await sleep(500);
@@ -98,7 +109,7 @@ async function getBalance(address) {
 
   } catch (err) {
 
-    console.log("RPC error, mencoba node lain...");
+    console.log("RPC error, switch node...");
 
     switchRPC();
 
@@ -113,6 +124,7 @@ async function getBalance(address) {
 //////////////////////////////////////////////////////
 
 async function getBandwidth(address) {
+
   try {
 
     const res = await tronWeb.trx.getAccountResources(address);
@@ -134,7 +146,9 @@ async function getBandwidth(address) {
 // SEND TRANSACTION
 //////////////////////////////////////////////////////
 
-async function sendTransaction(privateKey, toAddress, retry = 0) {
+async function sendTransaction(privateKey, toAddress, retry) {
+
+  if (!retry) retry = 0;
 
   const MAX_RETRY = 3;
 
@@ -143,26 +157,34 @@ async function sendTransaction(privateKey, toAddress, retry = 0) {
     const address = tronWeb.address.fromPrivateKey(privateKey);
 
     const balance = await getBalance(address);
+
     const bandwidth = await getBandwidth(address);
 
-    console.log(`Saldo ${address}: ${(balance / 1e6).toFixed(6)} TRX`);
-    console.log(`Bandwidth: ${bandwidth}`);
+    console.log("Saldo " + address + ": " + (balance / 1e6).toFixed(6) + " TRX");
+    console.log("Bandwidth: " + bandwidth);
 
     if (balance === 0) {
+
       console.log("Saldo kosong, skip\n");
+
       return;
     }
 
-    const reserve = 1_000_000;
+    const reserve = 1000000;
+
     const amount = balance - reserve;
 
     if (amount <= 0) {
+
       console.log("Saldo terlalu kecil\n");
+
       return;
     }
 
     if (bandwidth < 100) {
-      console.log("Bandwidth rendah, skip sementara\n");
+
+      console.log("Bandwidth rendah, skip\n");
+
       return;
     }
 
@@ -178,12 +200,12 @@ async function sendTransaction(privateKey, toAddress, retry = 0) {
 
     if (result.result) {
 
-      console.log("✅ Berhasil kirim");
-      console.log("TXID:", result.txid, "\n");
+      console.log("Berhasil kirim");
+      console.log("TXID: " + result.txid + "\n");
 
     } else {
 
-      console.log("❌ Transaksi gagal:", result);
+      console.log("Transaksi gagal:", result);
     }
 
   } catch (err) {
@@ -224,7 +246,9 @@ async function main() {
     process.exit();
   }
 
-  const count = parseInt(await ask("Jumlah wallet yang digenerate: "), 10);
+  const countInput = await ask("Jumlah wallet yang digenerate: ");
+
+  const count = parseInt(countInput);
 
   if (isNaN(count) || count <= 0) {
 
@@ -235,7 +259,7 @@ async function main() {
 
   const privateKeys = generateAccountsFromMnemonic(phrase, count);
 
-  console.log(`\nBerhasil generate ${privateKeys.length} wallet`);
+  console.log("\nBerhasil generate " + privateKeys.length + " wallet");
 
   saveAddresses(privateKeys);
 
@@ -255,7 +279,7 @@ async function main() {
 
   for (let i = 0; i < privateKeys.length; i++) {
 
-    console.log(`Akun ${i + 1}`);
+    console.log("Akun " + (i + 1));
 
     await sendTransaction(privateKeys[i], toAddress);
 
