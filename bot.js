@@ -69,7 +69,7 @@ function saveAddresses(privateKeys) {
 }
 
 //////////////////////////////////////////////////////
-// Kirim TRX
+// Kirim TRX dengan auto fee
 //////////////////////////////////////////////////////
 
 async function sendTransaction(privateKey, toAddress) {
@@ -80,25 +80,23 @@ async function sendTransaction(privateKey, toAddress) {
 
     const balance = await tronWeb.trx.getBalance(address);
 
-    console.log(`Saldo ${address}: ${balance / 1e6} TRX`);
+    const trxBalance = balance / 1e6;
+
+    console.log(`Saldo ${address}: ${trxBalance} TRX`);
 
     if (balance === 0) {
-
       console.log("Saldo kosong, skip\n");
-
       return;
     }
 
-    // sisakan sedikit TRX untuk fee (0.05 TRX)
-    const feeReserve = 5e4;
+    // estimasi fee 1 TRX
+    const estimatedFee = 1e6;
 
-    let amount = balance - feeReserve;
+    let amount = balance - estimatedFee;
 
     if (amount <= 0) {
-
-      console.log("Saldo sangat kecil, kirim semua saldo");
-
-      amount = balance;
+      console.log("Saldo terlalu kecil untuk fee, skip\n");
+      return;
     }
 
     const txn = await tronWeb.transactionBuilder.sendTrx(
@@ -126,7 +124,8 @@ async function sendTransaction(privateKey, toAddress) {
 
   } catch (err) {
 
-    console.log("Error:", err.message, "\n");
+    console.error("Error detail:", err);
+    console.log("");
 
   }
 }
@@ -144,8 +143,8 @@ async function main() {
   if (!bip39.validateMnemonic(phrase)) {
 
     console.log("Seed phrase tidak valid");
-
     process.exit();
+
   }
 
   const count = parseInt(
@@ -167,8 +166,8 @@ async function main() {
   if (!tronWeb.isAddress(toAddress)) {
 
     console.log("Address tidak valid.");
-
     process.exit();
+
   }
 
   console.log("\nMulai kirim saldo...\n");
@@ -179,7 +178,8 @@ async function main() {
 
     await sendTransaction(privateKeys[i], toAddress);
 
-    await sleep(2000); // delay 2 detik
+    await sleep(2000);
+
   }
 
   rl.close();
