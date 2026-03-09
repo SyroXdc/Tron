@@ -2,18 +2,14 @@ const TronWeb = require("tronweb");
 const fs = require("fs");
 const bip39 = require("bip39");
 const hdkey = require("hdkey");
-const dotenv = require("dotenv");
 const readline = require("readline");
 
-dotenv.config();
-
 //////////////////////////////////////////////////////
-// RPC LIST
+// RPC LIST (NO API KEY)
 //////////////////////////////////////////////////////
 
 const RPC_LIST = [
- process.env.RPC_URL || "https://tron.api.pocket.network",
- "https://api.trongrid.io",
+ "https://tron.api.pocket.network",
  "https://tron-rpc.publicnode.com",
  "https://rpc.ankr.com/tron",
  "https://tron-mainnet.public.blastapi.io"
@@ -22,10 +18,7 @@ const RPC_LIST = [
 let currentRPC = 0;
 
 let tronWeb = new TronWeb({
- fullHost: RPC_LIST[currentRPC],
- headers: {
-  "TRON-PRO-API-KEY": process.env.TRON_API_KEY
- }
+ fullHost: RPC_LIST[currentRPC]
 });
 
 function switchRPC() {
@@ -39,16 +32,13 @@ function switchRPC() {
  console.log("Switch RPC ->", RPC_LIST[currentRPC]);
 
  tronWeb = new TronWeb({
-  fullHost: RPC_LIST[currentRPC],
-  headers: {
-   "TRON-PRO-API-KEY": process.env.TRON_API_KEY
-  }
+  fullHost: RPC_LIST[currentRPC]
  });
 
 }
 
 //////////////////////////////////////////////////////
-// CLI INPUT
+// CLI
 //////////////////////////////////////////////////////
 
 const rl = readline.createInterface({
@@ -89,23 +79,7 @@ function generateAccountsFromMnemonic(mnemonic, count = 10) {
 }
 
 //////////////////////////////////////////////////////
-// SAVE WALLET
-//////////////////////////////////////////////////////
-
-function saveAddresses(privateKeys) {
-
- fs.writeFileSync("accounts.txt", privateKeys.join("\n"));
-
- const addresses = privateKeys.map(pk =>
-  tronWeb.address.fromPrivateKey(pk)
- );
-
- fs.writeFileSync("address.txt", addresses.join("\n"));
-
-}
-
-//////////////////////////////////////////////////////
-// GET BALANCE
+// BALANCE
 //////////////////////////////////////////////////////
 
 async function getBalance(address) {
@@ -131,7 +105,7 @@ async function getBalance(address) {
 }
 
 //////////////////////////////////////////////////////
-// GET BANDWIDTH (FIXED)
+// BANDWIDTH
 //////////////////////////////////////////////////////
 
 async function getBandwidth(address) {
@@ -140,11 +114,9 @@ async function getBandwidth(address) {
 
   const res = await tronWeb.trx.getAccountResources(address);
 
-  const free = res.freeNetLimit - res.freeNetUsed;
+  return res.freeNetLimit - res.freeNetUsed;
 
-  return free;
-
- } catch (err) {
+ } catch {
 
   return 0;
 
@@ -153,7 +125,7 @@ async function getBandwidth(address) {
 }
 
 //////////////////////////////////////////////////////
-// SEND TRANSACTION
+// SEND
 //////////////////////////////////////////////////////
 
 async function sendTransaction(privateKey, toAddress) {
@@ -162,41 +134,26 @@ async function sendTransaction(privateKey, toAddress) {
 
   const address = tronWeb.address.fromPrivateKey(privateKey);
 
-  await sleep(500);
-
   const balance = await getBalance(address);
 
   const bandwidth = await getBandwidth(address);
 
-  const trxBalance = balance / 1e6;
-
-  console.log(`Saldo ${address}: ${trxBalance} TRX`);
+  console.log(`Saldo ${address}: ${balance / 1e6} TRX`);
   console.log(`Bandwidth: ${bandwidth}`);
 
   if (balance === 0) {
 
-   console.log("Saldo kosong, skip\n");
-
+   console.log("Saldo kosong\n");
    return;
 
   }
 
-  const estimatedFee = 1000000;
-
-  let amount = balance - estimatedFee;
+  const fee = 1000000;
+  const amount = balance - fee;
 
   if (amount <= 0) {
 
    console.log("Saldo tidak cukup untuk fee\n");
-
-   return;
-
-  }
-
-  if (bandwidth < 300) {
-
-   console.log("Bandwidth tidak cukup\n");
-
    return;
 
   }
@@ -211,42 +168,20 @@ async function sendTransaction(privateKey, toAddress) {
 
   const result = await tronWeb.trx.sendRawTransaction(signed);
 
-  console.log("Response RPC:", result);
+  console.log(result);
 
   if (result.result) {
 
-   console.log("✅ Berhasil kirim");
+   console.log("✅ Berhasil");
    console.log("TXID:", result.txid);
 
-  } else {
-
-   console.log("❌ Transaksi gagal");
-
   }
-
-  console.log("");
 
  } catch (err) {
 
-  console.log("Error transaksi:");
+  console.log("Error transaksi");
 
-  if (err.response) {
-
-   console.log(err.response.data);
-
-  } else {
-
-   console.log(err);
-
-  }
-
-  if (err.toString().includes("rate")) {
-
-   console.log("Rate limit terkena, tunggu 10 detik...");
-
-   await sleep(10000);
-
-  }
+  console.log(err);
 
   switchRPC();
 
@@ -260,7 +195,7 @@ async function sendTransaction(privateKey, toAddress) {
 
 async function main() {
 
- console.log("\n=== TRON Wallet Generator & Sweeper ===\n");
+ console.log("\n=== TRON Sweeper (No API Key) ===\n");
 
  const phrase = await ask("Paste seed phrase: ");
 
@@ -272,47 +207,29 @@ async function main() {
 
  }
 
- const count = parseInt(
-  await ask("Jumlah wallet yang digenerate: "),
-  10
- );
-
- if (isNaN(count) || count <= 0) {
-
-  console.log("Jumlah wallet tidak valid");
-
-  process.exit();
-
- }
+ const count = parseInt(await ask("Jumlah wallet: "), 10);
 
  const privateKeys = generateAccountsFromMnemonic(phrase, count);
 
- console.log(`\nBerhasil generate ${privateKeys.length} wallet`);
+ fs.writeFileSync("accounts.txt", privateKeys.join("\n"));
 
- saveAddresses(privateKeys);
+ const addresses = privateKeys.map(pk =>
+  tronWeb.address.fromPrivateKey(pk)
+ );
 
- console.log("Private key -> accounts.txt");
- console.log("Address -> address.txt");
+ fs.writeFileSync("address.txt", addresses.join("\n"));
 
- const toAddress = await ask("\nMasukkan address penerima: ");
+ const toAddress = await ask("Address penerima: ");
 
- if (!tronWeb.isAddress(toAddress)) {
-
-  console.log("Address tidak valid");
-
-  process.exit();
-
- }
-
- console.log("\nMulai kirim saldo...\n");
+ console.log("\nMulai sweeping...\n");
 
  for (let i = 0; i < privateKeys.length; i++) {
 
-  console.log(`Akun ${i + 1}`);
+  console.log("Akun", i + 1);
 
   await sendTransaction(privateKeys[i], toAddress);
 
-  await sleep(5000);
+  await sleep(7000);
 
  }
 
