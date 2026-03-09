@@ -1,4 +1,4 @@
-const TronWeb = require("tronweb").default;
+const TronWeb = require("tronweb");
 const fs = require("fs");
 const bip39 = require("bip39");
 const hdkey = require("hdkey");
@@ -44,14 +44,14 @@ function generateAccountsFromMnemonic(mnemonic, count = 10) {
 // Simpan private key & address ke file
 function saveAddresses(privateKeys) {
   fs.writeFileSync("accounts.txt", privateKeys.join("\n"));
-  const addresses = privateKeys.map(pk => tronWeb.address.fromPrivateKey(pk));
+  const addresses = privateKeys.map(pk => tronWeb.privateKeyToAddress(pk).base58);
   fs.writeFileSync("address.txt", addresses.join("\n"));
 }
 
 // Kirim saldo TRX
 async function sendTransaction(privateKey, toAddress) {
   try {
-    const address = tronWeb.address.fromPrivateKey(privateKey);
+    const address = tronWeb.privateKeyToAddress(privateKey).base58;
     const balance = await tronWeb.trx.getBalance(address);
 
     console.log(`Saldo ${address}: ${balance / 1e6} TRX`);
