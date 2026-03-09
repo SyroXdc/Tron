@@ -121,12 +121,13 @@ async function sendTransaction(privateKey, toAddress) {
    return;
   }
 
-  // Fee minimum 2 TRX jika bandwidth tidak cukup
-  const estimatedFee = bandwidth < 200 ? 2_000_000 : 0;
-  const amount = balance - estimatedFee;
+  // Sisakan 1 TRX untuk fee transaksi
+  const reserve = 1_000_000; // 1 TRX
+
+  const amount = balance - reserve;
 
   if (amount <= 0) {
-   console.log("Saldo tidak cukup untuk fee, skip\n");
+   console.log("Saldo terlalu kecil untuk dikirim\n");
    return;
   }
 
