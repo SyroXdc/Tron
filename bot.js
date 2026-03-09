@@ -1,7 +1,7 @@
 const TronWeb = require("tronweb");
 const fs = require("fs");
 const bip39 = require("bip39");
-const hdkey = require("@ethereumjs/hdkey");
+const hdkey = require("hdkey");
 const dotenv = require("dotenv");
 const readline = require("readline");
 
@@ -23,23 +23,23 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-function ask(question) {
-  return new Promise((resolve) => rl.question(question, resolve));
+function ask(q) {
+  return new Promise(resolve => rl.question(q, resolve));
 }
 
 function generateAccountsFromMnemonic(mnemonic, count = 10) {
 
   const seed = bip39.mnemonicToSeedSync(mnemonic);
-  const wallet = hdkey.fromMasterSeed(seed);
+  const root = hdkey.fromMasterSeed(seed);
 
   const privateKeys = [];
 
   for (let i = 0; i < count; i++) {
 
-    const child = wallet.derivePath(`m/44'/195'/0'/0/${i}`);
-    const pk = child.privateKey.toString("hex");
+    const addrNode = root.derive(`m/44'/195'/0'/0/${i}`);
+    const privateKey = addrNode.privateKey.toString("hex");
 
-    privateKeys.push(pk);
+    privateKeys.push(privateKey);
   }
 
   return privateKeys;
@@ -65,7 +65,7 @@ async function sendTransaction(privateKey, toAddress) {
 
     const balance = await tronWeb.trx.getBalance(account.address);
 
-    console.log(`Saldo ${account.address} : ${balance / 1e6} TRX`);
+    console.log(`Saldo ${account.address}: ${balance / 1e6} TRX`);
 
     if (balance <= 1e6) {
       console.log("Saldo tidak cukup untuk fee");
@@ -86,9 +86,9 @@ async function sendTransaction(privateKey, toAddress) {
 
     console.log("TXID:", result.txid);
 
-  } catch (e) {
+  } catch (err) {
 
-    console.log("Error:", e.message);
+    console.log("Error:", err.message);
 
   }
 
