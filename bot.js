@@ -8,17 +8,36 @@ const readline = require("readline");
 dotenv.config();
 
 //////////////////////////////////////////////////////
-// RPC SETUP
+// RPC LIST
 //////////////////////////////////////////////////////
 
 const RPC_LIST = [
-  process.env.RPC_URL || "https://api.trongrid.io",
+  process.env.RPC_URL || "https://tron.api.pocket.network",
+  "https://api.trongrid.io",
   "https://tron-rpc.publicnode.com"
 ];
 
+let currentRPC = 0;
+
 let tronWeb = new TronWeb({
-  fullHost: RPC_LIST[0]
+  fullHost: RPC_LIST[currentRPC]
 });
+
+function switchRPC() {
+
+  currentRPC++;
+
+  if (currentRPC >= RPC_LIST.length) {
+    currentRPC = 0;
+  }
+
+  console.log("Switch RPC ->", RPC_LIST[currentRPC]);
+
+  tronWeb = new TronWeb({
+    fullHost: RPC_LIST[currentRPC]
+  });
+
+}
 
 //////////////////////////////////////////////////////
 // CLI INPUT
@@ -44,6 +63,7 @@ function sleep(ms) {
 function generateAccountsFromMnemonic(mnemonic, count = 10) {
 
   const seed = bip39.mnemonicToSeedSync(mnemonic);
+
   const root = hdkey.fromMasterSeed(seed);
 
   const privateKeys = [];
@@ -57,6 +77,7 @@ function generateAccountsFromMnemonic(mnemonic, count = 10) {
   }
 
   return privateKeys;
+
 }
 
 //////////////////////////////////////////////////////
@@ -72,6 +93,7 @@ function saveAddresses(privateKeys) {
   );
 
   fs.writeFileSync("address.txt", addresses.join("\n"));
+
 }
 
 //////////////////////////////////////////////////////
@@ -82,26 +104,22 @@ async function getBalance(address) {
 
   try {
 
-    const balance = await tronWeb.trx.getBalance(address);
-    return balance;
+    return await tronWeb.trx.getBalance(address);
 
   } catch (err) {
 
-    console.log("RPC error, ganti node...");
+    console.log("RPC error, mencoba node lain...");
 
-    tronWeb = new TronWeb({
-      fullHost: RPC_LIST[1]
-    });
+    switchRPC();
 
-    const balance = await tronWeb.trx.getBalance(address);
-    return balance;
+    return await tronWeb.trx.getBalance(address);
 
   }
 
 }
 
 //////////////////////////////////////////////////////
-// SEND TRX
+// SEND TRANSACTION
 //////////////////////////////////////////////////////
 
 async function sendTransaction(privateKey, toAddress) {
@@ -123,8 +141,7 @@ async function sendTransaction(privateKey, toAddress) {
 
     }
 
-    // estimasi fee 0.1 TRX
-    const estimatedFee = 100000;
+    const estimatedFee = 100000; // 0.1 TRX
 
     let amount = balance - estimatedFee;
 
@@ -160,8 +177,9 @@ async function sendTransaction(privateKey, toAddress) {
 
   } catch (err) {
 
-    console.error("Error:", err.message);
-    console.log("");
+    console.log("Error transaksi:", err.message);
+
+    switchRPC();
 
   }
 
@@ -209,7 +227,7 @@ async function main() {
 
   if (!tronWeb.isAddress(toAddress)) {
 
-    console.log("Address tidak valid.");
+    console.log("Address tidak valid");
     process.exit();
 
   }
