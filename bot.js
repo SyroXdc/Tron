@@ -117,6 +117,15 @@ async function getBalance(address) {
 }
 
 //////////////////////////////////////////////////////
+// GET BANDWIDTH
+//////////////////////////////////////////////////////
+
+async function getBandwidth(address) {
+  const account = await tronWeb.trx.getAccount(address);
+  return account ? account.bandwidth : 0;
+}
+
+//////////////////////////////////////////////////////
 // SEND TRANSACTION
 //////////////////////////////////////////////////////
 
@@ -127,28 +136,24 @@ async function sendTransaction(privateKey, toAddress) {
     const address = tronWeb.address.fromPrivateKey(privateKey);
 
     const balance = await getBalance(address);
+    const bandwidth = await getBandwidth(address);
 
     const trxBalance = balance / 1e6;
-
     console.log(`Saldo ${address}: ${trxBalance} TRX`);
 
     if (balance === 0) {
-
       console.log("Saldo kosong, skip\n");
       return;
-
     }
 
-    // Estimasi fee yang lebih tinggi (1 TRX)
-    const estimatedFee = 1000000; // 1 TRX
+    // Estimasi fee (1 TRX untuk transaksi)
+    const estimatedFee = 1000000; // 1 TRX dalam Sun (1000000)
 
-    let amount = balance - estimatedFee;
+    let amount = balance - estimatedFee; // Kirim saldo - fee
 
-    if (amount <= 0) {
-
-      console.log("Saldo terlalu kecil untuk fee\n");
+    if (amount <= 0 || bandwidth < 5000) {  // Minimum Bandwidth yang cukup untuk transaksi
+      console.log("Saldo atau Bandwidth tidak cukup untuk fee\n");
       return;
-
     }
 
     const txn = await tronWeb.transactionBuilder.sendTrx(
@@ -158,20 +163,15 @@ async function sendTransaction(privateKey, toAddress) {
     );
 
     const signed = await tronWeb.trx.sign(txn, privateKey);
-
     const result = await tronWeb.trx.sendRawTransaction(signed);
 
     console.log("Response RPC:", result);
 
     if (result.result) {
-
       console.log("✅ Berhasil kirim");
       console.log("TXID:", result.txid);
-
     } else {
-
       console.log("❌ Transaksi gagal");
-
     }
 
     console.log("");
