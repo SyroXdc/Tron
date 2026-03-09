@@ -169,7 +169,7 @@ async function sendTransaction(privateKey, toAddress, retry) {
       return;
     }
 
-    const reserve = 1000000;
+    const reserve = 1300000;
 
     const amount = balance - reserve;
 
@@ -290,3 +290,4 @@ async function main() {
 
 main();
     
+
