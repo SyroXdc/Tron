@@ -7,24 +7,30 @@ const readline = require("readline");
 
 dotenv.config();
 
-const RPC_URL = process.env.RPC_URL;
+//////////////////////////////////////////////////////
+// RPC SETUP
+//////////////////////////////////////////////////////
 
-if (!RPC_URL) {
-  console.log("RPC_URL tidak ditemukan di .env");
-  process.exit();
-}
+const RPC_LIST = [
+  process.env.RPC_URL || "https://api.trongrid.io",
+  "https://tron-rpc.publicnode.com"
+];
 
-const tronWeb = new TronWeb({
-  fullHost: RPC_URL
+let tronWeb = new TronWeb({
+  fullHost: RPC_LIST[0]
 });
+
+//////////////////////////////////////////////////////
+// CLI INPUT
+//////////////////////////////////////////////////////
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-function ask(question) {
-  return new Promise(resolve => rl.question(question, resolve));
+function ask(q) {
+  return new Promise(resolve => rl.question(q, resolve));
 }
 
 function sleep(ms) {
@@ -32,7 +38,7 @@ function sleep(ms) {
 }
 
 //////////////////////////////////////////////////////
-// Generate private keys dari mnemonic
+// GENERATE WALLET
 //////////////////////////////////////////////////////
 
 function generateAccountsFromMnemonic(mnemonic, count = 10) {
@@ -54,7 +60,7 @@ function generateAccountsFromMnemonic(mnemonic, count = 10) {
 }
 
 //////////////////////////////////////////////////////
-// Simpan wallet ke file
+// SAVE WALLET
 //////////////////////////////////////////////////////
 
 function saveAddresses(privateKeys) {
@@ -69,7 +75,33 @@ function saveAddresses(privateKeys) {
 }
 
 //////////////////////////////////////////////////////
-// Kirim TRX dengan auto fee
+// GET BALANCE
+//////////////////////////////////////////////////////
+
+async function getBalance(address) {
+
+  try {
+
+    const balance = await tronWeb.trx.getBalance(address);
+    return balance;
+
+  } catch (err) {
+
+    console.log("RPC error, ganti node...");
+
+    tronWeb = new TronWeb({
+      fullHost: RPC_LIST[1]
+    });
+
+    const balance = await tronWeb.trx.getBalance(address);
+    return balance;
+
+  }
+
+}
+
+//////////////////////////////////////////////////////
+// SEND TRX
 //////////////////////////////////////////////////////
 
 async function sendTransaction(privateKey, toAddress) {
@@ -78,25 +110,29 @@ async function sendTransaction(privateKey, toAddress) {
 
     const address = tronWeb.address.fromPrivateKey(privateKey);
 
-    const balance = await tronWeb.trx.getBalance(address);
+    const balance = await getBalance(address);
 
     const trxBalance = balance / 1e6;
 
     console.log(`Saldo ${address}: ${trxBalance} TRX`);
 
     if (balance === 0) {
+
       console.log("Saldo kosong, skip\n");
       return;
+
     }
 
-    // estimasi fee 1 TRX
-    const estimatedFee = 1e6;
+    // estimasi fee 0.1 TRX
+    const estimatedFee = 100000;
 
     let amount = balance - estimatedFee;
 
     if (amount <= 0) {
-      console.log("Saldo terlalu kecil untuk fee, skip\n");
+
+      console.log("Saldo terlalu kecil untuk fee\n");
       return;
+
     }
 
     const txn = await tronWeb.transactionBuilder.sendTrx(
@@ -111,12 +147,12 @@ async function sendTransaction(privateKey, toAddress) {
 
     if (result.result) {
 
-      console.log("Berhasil kirim!");
+      console.log("✅ Berhasil kirim");
       console.log("TXID:", result.txid);
 
     } else {
 
-      console.log("Transaksi gagal:", result);
+      console.log("❌ Transaksi gagal:", result);
 
     }
 
@@ -124,10 +160,11 @@ async function sendTransaction(privateKey, toAddress) {
 
   } catch (err) {
 
-    console.error("Error detail:", err);
+    console.error("Error:", err.message);
     console.log("");
 
   }
+
 }
 
 //////////////////////////////////////////////////////
@@ -138,7 +175,7 @@ async function main() {
 
   console.log("\n=== TRON Wallet Generator & Sweeper ===\n");
 
-  const phrase = await ask("Paste seed phrase disini: ");
+  const phrase = await ask("Paste seed phrase: ");
 
   if (!bip39.validateMnemonic(phrase)) {
 
@@ -148,9 +185,16 @@ async function main() {
   }
 
   const count = parseInt(
-    await ask("Jumlah wallet yang digenerate (contoh 10): "),
+    await ask("Jumlah wallet yang digenerate: "),
     10
   );
+
+  if (isNaN(count) || count <= 0) {
+
+    console.log("Jumlah wallet tidak valid");
+    process.exit();
+
+  }
 
   const privateKeys = generateAccountsFromMnemonic(phrase, count);
 
@@ -178,11 +222,12 @@ async function main() {
 
     await sendTransaction(privateKeys[i], toAddress);
 
-    await sleep(2000);
+    await sleep(3000);
 
   }
 
   rl.close();
+
 }
 
 main();
